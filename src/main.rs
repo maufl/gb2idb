@@ -9,7 +9,9 @@ use clap::{App, Arg};
 fn main() {
     let paramters = app().get_matches();
     let input_file = paramters.value_of("file").unwrap();
-    println!("Hello, world!");
+    let host = paramters.value_of("host").unwrap();
+    let port = paramters.value_of("port").unwrap();
+    let database = paramters.value_of("database").unwrap();
 }
 
 fn app() -> App<'static, 'static> {
@@ -25,6 +27,34 @@ fn app() -> App<'static, 'static> {
                 .long("file")
                 .help("The Sqlite database")
                 .required(true)
+                .default("health.db")
+                .takes_value(true),
+        )
+        .arg(
+            Arg::with_name("host")
+                .short("h")
+                .long("host")
+                .help("Host of the InfluxDB")
+                .required(true)
+                .default_value("localhost")
+                .takes_value(true),
+        )
+        .arg(
+            Arg::with_name("port")
+                .short("p")
+                .long("port")
+                .help("Port of the InfluxDB")
+                .required(true)
+                .default_value("8086")
+                .takes_value(true),
+        )
+        .arg(
+            Arg::with_name("database")
+                .short("d")
+                .long("database")
+                .help("The InfluxDB database")
+                .required(true)
+                .default_value("health")
                 .takes_value(true),
         )
 }
