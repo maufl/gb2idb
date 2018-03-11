@@ -30,12 +30,13 @@ fn main() {
     let host = paramters.value_of("host").unwrap();
     let port = paramters.value_of("port").unwrap();
     let database = paramters.value_of("database").unwrap();
+    let user_name = paramters.value_of("user_name").unwrap();
 
     let connection = match Connection::open(input_file) {
         Ok(conn) => conn,
         Err(err) => return error!("Error opening database file: {}", err),
     };
-    let mut statement = match 
+    let mut statement = match
         connection.prepare("SELECT TIMESTAMP, RAW_INTENSITY, STEPS, HEART_RATE FROM PEBBLE_HEALTH_ACTIVITY_SAMPLE WHERE DEVICE_ID = (?) AND USER_ID = (?)") {
             Ok(stmt) => stmt,
             Err(err) => return error!("Error preparing the query statement: {}", err)
@@ -58,13 +59,14 @@ fn main() {
             };
             match write!(
                 data,
-                "raw_intensity,person=felix value={raw_intensity} {timestamp}000000000\n\
-                 steps,person=felix value={steps} {timestamp}000000000\n\
-                 heart_rate,person=felix value={heart_rate} {timestamp}000000000\n",
+                "raw_intensity,person={user_name} value={raw_intensity} {timestamp}000000000\n\
+                 steps,person={user_name} value={steps} {timestamp}000000000\n\
+                 heart_rate,person={user_name} value={heart_rate} {timestamp}000000000\n",
                 raw_intensity = row.raw_intensity,
                 steps = row.steps,
                 heart_rate = row.heart_rate,
-                timestamp = row.timestamp
+                timestamp = row.timestamp,
+                user_name = user_name
             ) {
                 Ok(_) => (),
                 Err(err) => return error!("Error formatting data: {}", err),
@@ -121,5 +123,13 @@ fn app() -> App<'static, 'static> {
                 .long("database")
                 .help("The InfluxDB database")
                 .default_value("health"),
+        )
+        .arg(
+            Arg::with_name("user_name")
+                .short("n")
+                .long("user_name")
+                .help("The user name in InfluxDB")
+                .required(true)
+                .takes_value(true),
         )
 }
