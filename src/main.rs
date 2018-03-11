@@ -50,6 +50,8 @@ fn main() {
         Ok(rows) => rows,
         Err(error) => return error!("Error querying database: {}", error),
     };
+
+    let client = reqwest::Client::new();
     for chunk in &rows.chunks(100) {
         let mut data = String::new();
         for result in chunk {
@@ -72,6 +74,27 @@ fn main() {
                 Err(err) => return error!("Error formatting data: {}", err),
             };
         }
+        match client
+            .post(
+                format!(
+                    "http://{host}:{port}/write?db={database}",
+                    host = host,
+                    port = port,
+                    database = database
+                ).as_str(),
+            )
+            .body(data)
+            .send()
+        {
+            Ok(mut resp) => if !resp.status().is_success() {
+                return error!(
+                    "Error writing to database: {}",
+                    resp.text()
+                        .unwrap_or("Server did not return error".to_string())
+                );
+            },
+            Err(err) => return error!("Error connecting to InfluxDB database: {}", err),
+        };
     }
 }
 
