@@ -1,0 +1,10 @@
+[package]
+name = "gb2idb"
+version = "0.1.0"
+authors = ["Felix Konstantin Maurer <maufl@maufl.de>"]
+
+[dependencies]
+clap = "2.31"
+rusqlite = "0.13"
+reqwest = "0.8"
+log = "0.4"
