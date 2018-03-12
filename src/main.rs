@@ -47,7 +47,7 @@ fn main() {
             }
         };
         query_statement.push_str(" AND TIMESTAMP > (?)");
-        query_paramters.push(start_date.and_hms(0, 0, 0).to_string());
+        query_paramters.push(start_date.and_hms(0, 0, 0).timestamp().to_string());
     };
     if let Some(end_date) = paramters.value_of("end_date") {
         let end_date = match NaiveDate::parse_from_str(end_date, "%F") {
@@ -60,7 +60,7 @@ fn main() {
             }
         };
         query_statement.push_str(" AND TIMESTAMP < (?)");
-        query_paramters.push(end_date.and_hms(0, 0, 0).to_string());
+        query_paramters.push(end_date.and_hms(0, 0, 0).timestamp().to_string());
     };
 
     let connection = match Connection::open(input_file) {
