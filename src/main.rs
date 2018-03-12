@@ -1,5 +1,3 @@
-#![feature(conservative_impl_trait)]
-
 extern crate clap;
 extern crate env_logger;
 extern crate itertools;
