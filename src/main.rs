@@ -1,3 +1,4 @@
+extern crate chrono;
 extern crate clap;
 extern crate env_logger;
 extern crate itertools;
@@ -10,6 +11,7 @@ use clap::{App, Arg};
 use rusqlite::Connection;
 use itertools::Itertools;
 use std::fmt::Write;
+use chrono::DateTime;
 
 struct Entry {
     timestamp: u32,
@@ -30,16 +32,48 @@ fn main() {
     let database = paramters.value_of("database").unwrap();
     let user_name = paramters.value_of("user_name").unwrap();
 
+    let mut query_statement = String::from("SELECT TIMESTAMP, RAW_INTENSITY, STEPS, HEART_RATE FROM PEBBLE_HEALTH_ACTIVITY_SAMPLE WHERE DEVICE_ID = (?) AND USER_ID = (?)");
+    let mut query_paramters = vec![device_id.to_owned(), user_id.to_owned()];
+    if let Some(start_time) = paramters.value_of("start_time") {
+        let start_time = match DateTime::parse_from_str(start_time, "%F") {
+            Ok(d) => d,
+            Err(err) => {
+                return error!(
+                    "Start time is invalid, format must be %Y-%m-%d (padded with zeros): {}",
+                    err
+                )
+            }
+        };
+        query_statement.push_str(" AND TIMESTAMP > (?)");
+        query_paramters.push(start_time.to_string());
+    };
+    if let Some(end_time) = paramters.value_of("end_time") {
+        let end_time = match DateTime::parse_from_str(end_time, "%F") {
+            Ok(d) => d,
+            Err(err) => {
+                return error!(
+                    "End time is invalid, format must be %Y-%m-%d (padded with zeros): {}",
+                    err
+                )
+            }
+        };
+        query_statement.push_str(" AND TIMESTAMP < (?)");
+        query_paramters.push(end_time.to_string());
+    };
+
     let connection = match Connection::open(input_file) {
         Ok(conn) => conn,
         Err(err) => return error!("Error opening database file: {}", err),
     };
-    let mut statement = match
-        connection.prepare("SELECT TIMESTAMP, RAW_INTENSITY, STEPS, HEART_RATE FROM PEBBLE_HEALTH_ACTIVITY_SAMPLE WHERE DEVICE_ID = (?) AND USER_ID = (?)") {
-            Ok(stmt) => stmt,
-            Err(err) => return error!("Error preparing the query statement: {}", err)
-        };
-    let rows = match statement.query_map(&[&device_id, &user_id], |row| Entry {
+    let mut statement = match connection.prepare(&query_statement) {
+        Ok(stmt) => stmt,
+        Err(err) => return error!("Error preparing the query statement: {}", err),
+    };
+    let query_paramters: Vec<&rusqlite::types::ToSql> = query_paramters
+        .iter()
+        .map(|p| p as &rusqlite::types::ToSql)
+        .collect();
+    let rows = match statement.query_map(query_paramters.as_slice(), |row| Entry {
         timestamp: row.get(0),
         raw_intensity: row.get(1),
         steps: row.get(2),
@@ -123,6 +157,20 @@ fn app() -> App<'static, 'static> {
                 .long("device_id")
                 .help("The device id")
                 .default_value("1"),
+        )
+        .arg(
+            Arg::with_name("start_time")
+                .short("s")
+                .long("start_time")
+                .help("Starting time of imported data")
+                .takes_value(true),
+        )
+        .arg(
+            Arg::with_name("end_time")
+                .short("e")
+                .long("end_time")
+                .help("Ending time of imported data")
+                .takes_value(true),
         )
         .arg(
             Arg::with_name("host")
