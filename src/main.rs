@@ -11,7 +11,9 @@ use clap::{App, Arg};
 use rusqlite::Connection;
 use itertools::Itertools;
 use std::fmt::Write;
-use chrono::DateTime;
+use chrono::NaiveDate;
+
+const BATCH_SIZE: usize = 100;
 
 struct Entry {
     timestamp: u32,
@@ -34,31 +36,31 @@ fn main() {
 
     let mut query_statement = String::from("SELECT TIMESTAMP, RAW_INTENSITY, STEPS, HEART_RATE FROM PEBBLE_HEALTH_ACTIVITY_SAMPLE WHERE DEVICE_ID = (?) AND USER_ID = (?)");
     let mut query_paramters = vec![device_id.to_owned(), user_id.to_owned()];
-    if let Some(start_time) = paramters.value_of("start_time") {
-        let start_time = match DateTime::parse_from_str(start_time, "%F") {
+    if let Some(start_date) = paramters.value_of("start_date") {
+        let start_date = match NaiveDate::parse_from_str(start_date, "%F") {
             Ok(d) => d,
             Err(err) => {
                 return error!(
-                    "Start time is invalid, format must be %Y-%m-%d (padded with zeros): {}",
+                    "Start date is invalid, format must be %Y-%m-%d (padded with zeros): {}",
                     err
                 )
             }
         };
         query_statement.push_str(" AND TIMESTAMP > (?)");
-        query_paramters.push(start_time.to_string());
+        query_paramters.push(start_date.and_hms(0, 0, 0).to_string());
     };
-    if let Some(end_time) = paramters.value_of("end_time") {
-        let end_time = match DateTime::parse_from_str(end_time, "%F") {
+    if let Some(end_date) = paramters.value_of("end_date") {
+        let end_date = match NaiveDate::parse_from_str(end_date, "%F") {
             Ok(d) => d,
             Err(err) => {
                 return error!(
-                    "End time is invalid, format must be %Y-%m-%d (padded with zeros): {}",
+                    "End date is invalid, format must be %Y-%m-%d (padded with zeros): {}",
                     err
                 )
             }
         };
         query_statement.push_str(" AND TIMESTAMP < (?)");
-        query_paramters.push(end_time.to_string());
+        query_paramters.push(end_date.and_hms(0, 0, 0).to_string());
     };
 
     let connection = match Connection::open(input_file) {
@@ -84,7 +86,9 @@ fn main() {
     };
 
     let client = reqwest::Client::new();
-    for chunk in &rows.chunks(100) {
+    debug!("Starting information transfer");
+    for chunk in &rows.chunks(BATCH_SIZE) {
+        debug!("Submitting chunk of size {}", BATCH_SIZE);
         let mut data = String::new();
         for result in chunk {
             let row = match result {
@@ -128,6 +132,7 @@ fn main() {
             Err(err) => return error!("Error connecting to InfluxDB database: {}", err),
         };
     }
+    debug!("Finished data transfer");
 }
 
 fn app() -> App<'static, 'static> {
@@ -159,17 +164,17 @@ fn app() -> App<'static, 'static> {
                 .default_value("1"),
         )
         .arg(
-            Arg::with_name("start_time")
+            Arg::with_name("start_date")
                 .short("s")
-                .long("start_time")
-                .help("Starting time of imported data")
+                .long("start_date")
+                .help("Starting date of imported data")
                 .takes_value(true),
         )
         .arg(
-            Arg::with_name("end_time")
+            Arg::with_name("end_date")
                 .short("e")
-                .long("end_time")
-                .help("Ending time of imported data")
+                .long("end_date")
+                .help("Ending date of imported data")
                 .takes_value(true),
         )
         .arg(
